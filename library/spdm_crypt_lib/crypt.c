@@ -1653,7 +1653,7 @@ boolean spdm_x509_certificate_check(IN const uint8 *cert, IN uintn cert_size)
 		goto cleanup;
 	}
 
-	// 3. sinature_algorithem
+	// 3. SinatureAlgorithem
 	value = 0;
 	ret = x509_get_signature_algorithm(cert, cert_size, NULL, &value);
 	if (ret != RETURN_BUFFER_TOO_SMALL || value == 0) {
@@ -1661,23 +1661,29 @@ boolean spdm_x509_certificate_check(IN const uint8 *cert, IN uintn cert_size)
 		goto cleanup;
 	}
 
-	// 4. issuer_name
+	// 4. Issuer
 	asn1_buffer_len = 0;
 	status = x509_get_issuer_name(cert, cert_size, NULL, &asn1_buffer_len);
+	if (status && asn1_buffer_len == 0) {
+		goto cleanup;
+	}
 	if (asn1_buffer_len <= 0) {
 		status = FALSE;
 		goto cleanup;
 	}
 
-	// 5. subject_name
+	// 5. SubjectName
 	asn1_buffer_len = 0;
 	status = x509_get_subject_name(cert, cert_size, NULL, &asn1_buffer_len);
+	if (status && asn1_buffer_len == 0) {
+		goto cleanup;
+	}
 	if (asn1_buffer_len <= 0) {
 		status = FALSE;
 		goto cleanup;
 	}
 
-	// 6. validaity
+	// 6. Validaity
 	status = x509_get_validity(cert, cert_size, end_cert_from,
 				   &end_cert_from_len, end_cert_to,
 				   &end_cert_to_len);
@@ -1691,7 +1697,7 @@ boolean spdm_x509_certificate_check(IN const uint8 *cert, IN uintn cert_size)
 		goto cleanup;
 	}
 
-	// 7. subject_public_key
+	// 7. SubjectPublic KeyInfo
 	status = rsa_get_public_key_from_x509(cert, cert_size, &rsa_context);
 	if (!status) {
 		status = ec_get_public_key_from_x509(cert, cert_size,
@@ -1701,15 +1707,14 @@ boolean spdm_x509_certificate_check(IN const uint8 *cert, IN uintn cert_size)
 		goto cleanup;
 	}
 
-	// 8. extended_key_usage
+	// 8. Extended key usage
 	value = 0;
 	ret = x509_get_extended_key_usage(cert, cert_size, NULL, &value);
 	if (ret != RETURN_BUFFER_TOO_SMALL || value == 0) {
-		status = FALSE;
 		goto cleanup;
 	}
 
-	// 9. key_usage
+	// 9. key usage
 	status = x509_get_key_usage(cert, cert_size, &value);
 	if (!status) {
 		goto cleanup;
