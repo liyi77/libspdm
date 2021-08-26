@@ -26,14 +26,10 @@ typedef struct {
 return_status try_spdm_get_version(IN spdm_context_t *spdm_context)
 {
 	return_status status;
+	boolean result;
 	spdm_get_version_request_t spdm_request;
 	spdm_version_response_max_t spdm_response;
 	uintn spdm_response_size;
-	uintn index;
-	uint8 version;
-	uint8 compatible_version_count;
-	spdm_version_number_t
-		compatible_version_number_entry[MAX_SPDM_VERSION_COUNT];
 
 	spdm_context->connection_info.connection_state =
 		SPDM_CONNECTION_STATE_NOT_STARTED;
@@ -101,6 +97,14 @@ return_status try_spdm_get_version(IN spdm_context_t *spdm_context)
 	spdm_response_size = sizeof(spdm_version_response) +
 			     spdm_response.version_number_entry_count *
 				     sizeof(spdm_version_number_t);
+
+	result = spdm_negotiate_connection_version(spdm_context, spdm_context->local_context.version.spdm_version,
+									spdm_context->local_context.version.spdm_version_count,
+									spdm_response.version_number_entry,
+									spdm_response.version_number_entry_count);
+	if (result != TRUE) {
+		return RETURN_DEVICE_ERROR;
+	}
 	//
 	// Cache data
 	//
@@ -115,32 +119,6 @@ return_status try_spdm_get_version(IN spdm_context_t *spdm_context)
 		reset_managed_buffer(&spdm_context->transcript.message_a);
 		return RETURN_SECURITY_VIOLATION;
 	}
-	compatible_version_count = 0;
-
-	zero_mem(&compatible_version_number_entry,
-		 sizeof(compatible_version_number_entry));
-	for (index = 0; index < spdm_response.version_number_entry_count;
-	     index++) {
-		version = (uint8)(
-			(spdm_response.version_number_entry[index].major_version
-			 << 4) |
-			spdm_response.version_number_entry[index].minor_version);
-
-		if (version == SPDM_MESSAGE_VERSION_11 ||
-		    version == SPDM_MESSAGE_VERSION_10) {
-			compatible_version_number_entry[compatible_version_count] =
-				spdm_response.version_number_entry[index];
-			compatible_version_count++;
-		}
-	}
-	if (compatible_version_count == 0) {
-		return RETURN_DEVICE_ERROR;
-	}
-	spdm_context->connection_info.version.spdm_version_count =
-		compatible_version_count;
-	copy_mem(spdm_context->connection_info.version.spdm_version,
-		 compatible_version_number_entry,
-		 sizeof(spdm_version_number_t) * compatible_version_count);
 
 	spdm_context->connection_info.connection_state =
 		SPDM_CONNECTION_STATE_AFTER_VERSION;

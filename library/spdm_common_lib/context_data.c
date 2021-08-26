@@ -1133,3 +1133,80 @@ uintn spdm_get_context_size(void)
 	return sizeof(spdm_context_t) +
 	       spdm_secured_message_get_context_size() * MAX_SPDM_SESSION_COUNT;
 }
+
+/**
+  Return the SPDMversion field of the version number struct.
+
+  @return the SPDMversion of the version number struct.
+**/
+uint8 spdm_get_version_from_struct(IN spdm_version_number_t ver)
+{
+	return (uint8)((ver.major_version << 4) | ver.minor_version);
+}
+
+/**
+  Negotiate SPDMversion for connection.
+  ver_set is the local version set of requester, res_ver_set is the version set of responder.
+  All version sets must follow ascending order: 
+	The lowest version should be stored in the lowest address of the array(set[0]);
+	The highest version should be stored in the highest address of the array(set[MAXSIZE-1]).
+
+  @param  spdm_context				A pointer to the SPDM context.
+  @param  ver_set		            A pointer to the requester version set.
+  @param  ver_num		            Version number of requester.
+  @param  res_ver_set		        A pointer to the responder version set.
+  @param  res_ver_num		        Version number of responder.
+
+  @retval TRUE               		Negotiation successfully, connect version be saved to context.
+  @retval FALSE					    Negotiation failed.
+*/
+boolean spdm_negotiate_connection_version(IN void *context, IN spdm_version_number_t *ver_set, IN uintn ver_num,
+									   	IN spdm_version_number_t *res_ver_set, IN uintn res_ver_num)
+{
+	uint8 req_version;
+	uint8 res_version;
+	boolean ver_available;
+	intn req_index;
+	intn res_index;
+	spdm_context_t *spdm_context;
+
+	if (ver_set == NULL || ver_num == 0) {
+		return FALSE;
+	}
+	if (res_ver_set == NULL || res_ver_num == 0) {
+		return FALSE;
+	}
+
+	spdm_context = context;
+	ver_available = FALSE;
+	/**
+  	  Find biggest same version and make req_index point to it.
+	  If not found, ver_available will be FALSE.
+	**/
+	for (req_index = ver_num - 1; req_index >= 0; req_index--)
+	{
+		req_version = spdm_get_version_from_struct(ver_set[req_index]);
+		res_index = res_ver_num - 1;
+		res_version = spdm_get_version_from_struct(res_ver_set[res_index]);
+		while (res_index != 0 && res_version > req_version)
+		{
+			res_index--;
+			res_version = spdm_get_version_from_struct(res_ver_set[res_index]);
+		}
+		if (req_version == res_version) {
+			ver_available = TRUE;
+			DEBUG((DEBUG_INFO,"connect ver: %x \n",req_version));
+			break;
+		}
+	}
+
+	if (ver_available == TRUE) {
+		spdm_context->connection_info.version.spdm_version_count = 1;
+		copy_mem(spdm_context->connection_info.version.spdm_version,
+			ver_set + req_index,
+			sizeof(spdm_version_number_t));
+		return TRUE;
+	} else {
+		return FALSE;
+	}
+}
