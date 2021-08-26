@@ -575,8 +575,6 @@ void test_spdm_requester_get_version_case10(void **state)
 
 	status = spdm_get_version(spdm_context);
 	assert_int_equal(status, RETURN_SUCCESS);
-	assert_int_equal(
-		spdm_context->connection_info.version.spdm_version_count, 2);
 }
 
 /**
