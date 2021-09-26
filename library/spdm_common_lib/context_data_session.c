@@ -64,6 +64,8 @@ void spdm_session_info_init(IN spdm_context_t *spdm_context,
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 	session_info->session_transcript.message_f.max_buffer_size =
 		MAX_SPDM_MESSAGE_BUFFER_SIZE;
+	session_info->session_transcript.message_m.max_buffer_size =
+		MAX_SPDM_MESSAGE_BUFFER_SIZE;
 }
 
 /**

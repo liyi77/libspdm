@@ -204,6 +204,7 @@ typedef struct {
 	// K  = Concatenate (PSK_EXCHANGE request, PSK_EXCHANGE response)
 	// F  = Concatenate (PSK_FINISH request, PSK_FINISH response)
 	//
+	large_managed_buffer_t message_m;
 } spdm_session_transcript_t;
 
 typedef struct {
@@ -468,13 +469,14 @@ boolean spdm_calculate_m1m2(IN void *context, IN boolean is_mut,
   This function calculates l1l2.
 
   @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info					A pointer to the SPDM session context.
   @param  l1l2_buffer_size               size in bytes of the l1l2
   @param  l1l2_buffer                   The buffer to store the l1l2
 
   @retval RETURN_SUCCESS  l1l2 is calculated.
 */
-boolean spdm_calculate_l1l2(IN void *context, IN OUT uintn *l1l2_buffer_size,
-			    OUT void *l1l2_buffer);
+boolean spdm_calculate_l1l2(IN void *context, IN void *session_info,
+				IN OUT uintn *l1l2_buffer_size, OUT void *l1l2_buffer);
 
 /**
   This function generates the certificate chain hash.
@@ -597,18 +599,21 @@ spdm_generate_measurement_summary_hash(IN spdm_context_t *spdm_context,
   This function generates the measurement signature to response message based upon l1l2.
 
   @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info					A pointer to the SPDM session context.
   @param  signature                    The buffer to store the signature.
 
-  @retval TRUE  measurement signature is created.
-  @retval FALSE measurement signature is not created.
+  @retval TRUE  measurement signature is generated.
+  @retval FALSE measurement signature is not generated.
 **/
 boolean spdm_generate_measurement_signature(IN spdm_context_t *spdm_context,
+						IN spdm_session_info_t *session_info,
 					    OUT uint8 *signature);
 
 /**
   This function verifies the measurement signature based upon l1l2.
 
   @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info					A pointer to the SPDM session context.
   @param  sign_data                     The signature data buffer.
   @param  sign_data_size                 size in bytes of the signature data buffer.
 
@@ -616,6 +621,7 @@ boolean spdm_generate_measurement_signature(IN spdm_context_t *spdm_context,
   @retval FALSE signature verification fail.
 **/
 boolean spdm_verify_measurement_signature(IN spdm_context_t *spdm_context,
+					  IN spdm_session_info_t *session_info,
 					  IN void *sign_data,
 					  IN uintn sign_data_size);
 

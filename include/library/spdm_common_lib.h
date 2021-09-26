@@ -487,7 +487,7 @@ void spdm_reset_message_mut_c(IN void *spdm_context);
 
   @param  spdm_context                  A pointer to the SPDM context.
 **/
-void spdm_reset_message_m(IN void *spdm_context);
+void spdm_reset_message_m(IN void *spdm_context, IN void *session_info);
 
 /**
   Reset message F cache in SPDM context.
@@ -580,8 +580,8 @@ return_status spdm_append_message_mut_c(IN void *spdm_context, IN void *message,
   @return RETURN_SUCCESS          message is appended.
   @return RETURN_OUT_OF_RESOURCES message is not appended because the internal cache is full.
 **/
-return_status spdm_append_message_m(IN void *spdm_context, IN void *message,
-				    IN uintn message_size);
+return_status spdm_append_message_m(IN void *spdm_context, IN void *session_info,
+            IN void *message, IN uintn message_size);
 
 /**
   Append message K cache in SPDM context.
