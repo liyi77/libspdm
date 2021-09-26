@@ -85,6 +85,7 @@ return_status try_spdm_get_measurement(IN void *context, IN uint32 *session_id,
 		    SPDM_CONNECTION_STATE_AUTHENTICATED) {
 			return RETURN_UNSUPPORTED;
 		}
+		session_info = NULL;
 	} else {
 		if (spdm_context->connection_info.connection_state <
 		    SPDM_CONNECTION_STATE_NEGOTIATED) {
@@ -183,7 +184,7 @@ return_status try_spdm_get_measurement(IN void *context, IN uint32 *session_id,
 		}
 	} else if (spdm_response.header.request_response_code !=
 		   SPDM_MEASUREMENTS) {
-		reset_managed_buffer(&spdm_context->transcript.message_m);
+		spdm_reset_message_m(spdm_context, session_info);
 		return RETURN_DEVICE_ERROR;
 	}
 	if (spdm_response_size < sizeof(spdm_measurements_response_t)) {
@@ -196,8 +197,7 @@ return_status try_spdm_get_measurement(IN void *context, IN uint32 *session_id,
 	if (measurement_operation ==
 	    SPDM_GET_MEASUREMENTS_REQUEST_MEASUREMENT_OPERATION_TOTAL_NUMBER_OF_MEASUREMENTS) {
 		if (spdm_response.number_of_blocks != 0) {
-			reset_managed_buffer(
-				&spdm_context->transcript.message_m);
+			spdm_reset_message_m(spdm_context, session_info);
 			return RETURN_DEVICE_ERROR;
 		}
 	} else if (measurement_operation ==
@@ -216,8 +216,7 @@ return_status try_spdm_get_measurement(IN void *context, IN uint32 *session_id,
 	if (measurement_operation ==
 	    SPDM_GET_MEASUREMENTS_REQUEST_MEASUREMENT_OPERATION_TOTAL_NUMBER_OF_MEASUREMENTS) {
 		if (measurement_record_data_length != 0) {
-			reset_managed_buffer(
-				&spdm_context->transcript.message_m);
+			spdm_reset_message_m(spdm_context, session_info);
 			return RETURN_DEVICE_ERROR;
 		}
 	} else {
@@ -242,15 +241,13 @@ return_status try_spdm_get_measurement(IN void *context, IN uint32 *session_id,
 		    sizeof(spdm_measurements_response_t) +
 			    measurement_record_data_length + SPDM_NONCE_SIZE +
 			    sizeof(uint16)) {
-			reset_managed_buffer(
-				&spdm_context->transcript.message_m);
+			spdm_reset_message_m(spdm_context, session_info);
 			return RETURN_DEVICE_ERROR;
 		}
 		if (spdm_is_version_supported(spdm_context,
 					      SPDM_MESSAGE_VERSION_11) &&
 		    spdm_response.header.param2 != slot_id_param) {
-			reset_managed_buffer(
-				&spdm_context->transcript.message_m);
+			spdm_reset_message_m(spdm_context, session_info);
 			return RETURN_SECURITY_VIOLATION;
 		}
 		ptr = measurement_record_data + measurement_record_data_length;
@@ -279,18 +276,17 @@ return_status try_spdm_get_measurement(IN void *context, IN uint32 *session_id,
 		//
 		// Cache data
 		//
-		status = spdm_append_message_m(spdm_context, &spdm_request,
+		status = spdm_append_message_m(spdm_context, session_info, &spdm_request,
 						spdm_request_size);
 		if (RETURN_ERROR(status)) {
 			return RETURN_SECURITY_VIOLATION;
 		}
 
-		status = spdm_append_message_m(spdm_context, &spdm_response,
+		status = spdm_append_message_m(spdm_context, session_info, &spdm_response,
 					       spdm_response_size -
 						       signature_size);
 		if (RETURN_ERROR(status)) {
-			reset_managed_buffer(
-				&spdm_context->transcript.message_m);
+			spdm_reset_message_m(spdm_context, session_info);
 			return RETURN_SECURITY_VIOLATION;
 		}
 
@@ -304,16 +300,15 @@ return_status try_spdm_get_measurement(IN void *context, IN uint32 *session_id,
 		internal_dump_hex(signature, signature_size);
 
 		result = spdm_verify_measurement_signature(
-			spdm_context, signature, signature_size);
+			spdm_context, session_info, signature, signature_size);
 		if (!result) {
 			spdm_context->error_state =
 				SPDM_STATUS_ERROR_MEASUREMENT_AUTH_FAILURE;
-			reset_managed_buffer(
-				&spdm_context->transcript.message_m);
+			spdm_reset_message_m(spdm_context, session_info);
 			return RETURN_SECURITY_VIOLATION;
 		}
 
-		reset_managed_buffer(&spdm_context->transcript.message_m);
+		spdm_reset_message_m(spdm_context, session_info);
 	} else {
 		if (spdm_response_size <
 		    sizeof(spdm_measurements_response_t) +
@@ -347,17 +342,16 @@ return_status try_spdm_get_measurement(IN void *context, IN uint32 *session_id,
 		//
 		// Cache data
 		//
-		status = spdm_append_message_m(spdm_context, &spdm_request,
+		status = spdm_append_message_m(spdm_context, session_info, &spdm_request,
 						spdm_request_size);
 		if (RETURN_ERROR(status)) {
 			return RETURN_SECURITY_VIOLATION;
 		}
 
-		status = spdm_append_message_m(spdm_context, &spdm_response,
+		status = spdm_append_message_m(spdm_context, session_info, &spdm_response,
 					       spdm_response_size);
 		if (RETURN_ERROR(status)) {
-			reset_managed_buffer(
-				&spdm_context->transcript.message_m);
+			spdm_reset_message_m(spdm_context, session_info);
 			return RETURN_SECURITY_VIOLATION;
 		}
 	}

@@ -644,13 +644,20 @@ void spdm_reset_message_mut_c(IN void *context)
   Reset message M cache in SPDM context.
 
   @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info					A pointer to the SPDM session context.
 **/
-void spdm_reset_message_m(IN void *context)
+void spdm_reset_message_m(IN void *context, IN void *session_info)
 {
 	spdm_context_t *spdm_context;
+	spdm_session_info_t *spdm_session_info;
 
-	spdm_context = context;
-	reset_managed_buffer(&spdm_context->transcript.message_m);
+	if (session_info == NULL) {
+		spdm_context = context;
+		reset_managed_buffer(&spdm_context->transcript.message_m);
+	} else {
+		spdm_session_info = session_info;
+		reset_managed_buffer(&spdm_session_info->session_transcript.message_m);
+	}
 }
 
 /**
@@ -823,20 +830,29 @@ return_status spdm_append_message_mut_c(IN void *context, IN void *message,
   Append message M cache in SPDM context.
 
   @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info					A pointer to the SPDM session context.
   @param  message                      message buffer.
   @param  message_size                  size in bytes of message buffer.
 
   @return RETURN_SUCCESS          message is appended.
   @return RETURN_OUT_OF_RESOURCES message is not appended because the internal cache is full.
 **/
-return_status spdm_append_message_m(IN void *context, IN void *message,
-				    IN uintn message_size)
+return_status spdm_append_message_m(IN void *context, IN void *session_info,
+					IN void *message, IN uintn message_size)
 {
 	spdm_context_t *spdm_context;
+	spdm_session_info_t *spdm_session_info;
 
-	spdm_context = context;
-	return append_managed_buffer(&spdm_context->transcript.message_m,
-				     message, message_size);
+	if (session_info == NULL) {
+		spdm_context = context;
+		return append_managed_buffer(&spdm_context->transcript.message_m,
+				    	 message, message_size);
+	} else {
+		spdm_session_info = session_info;
+		return append_managed_buffer(
+			&spdm_session_info->session_transcript.message_m, message,
+			message_size);
+	}
 }
 
 /**

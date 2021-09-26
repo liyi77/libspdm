@@ -276,43 +276,51 @@ boolean spdm_calculate_m1m2(IN void *context, IN boolean is_mut,
   This function calculates l1l2.
 
   @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info					A pointer to the SPDM session context.
   @param  l1l2_buffer_size               size in bytes of the l1l2
   @param  l1l2_buffer                   The buffer to store the l1l2
 
   @retval RETURN_SUCCESS  l1l2 is calculated.
 */
-boolean spdm_calculate_l1l2(IN void *context, IN OUT uintn *l1l2_buffer_size,
-			    OUT void *l1l2_buffer)
+boolean spdm_calculate_l1l2(IN void *context, IN void *session_info,
+				IN OUT uintn *l1l2_buffer_size, OUT void *l1l2_buffer)
 {
 	spdm_context_t *spdm_context;
+	spdm_session_info_t *spdm_session_info;
 	uint32 hash_size;
 	uint8 hash_data[MAX_HASH_SIZE];
 
 	spdm_context = context;
+	spdm_session_info = session_info;
 
 	hash_size = spdm_get_hash_size(
 		spdm_context->connection_info.algorithm.base_hash_algo);
 
+	if (spdm_session_info == NULL) {
+		*l1l2_buffer_size =
+			get_managed_buffer_size(&spdm_context->transcript.message_m);
+		copy_mem(l1l2_buffer,
+			get_managed_buffer(&spdm_context->transcript.message_m),
+			*l1l2_buffer_size);
+	} else {
+		DEBUG((DEBUG_INFO, "use message_m in session :\n"));
+		*l1l2_buffer_size =
+			get_managed_buffer_size(&spdm_session_info->session_transcript.message_m);
+		copy_mem(l1l2_buffer,
+			get_managed_buffer(&spdm_session_info->session_transcript.message_m),
+			*l1l2_buffer_size);
+	}
+
 	DEBUG((DEBUG_INFO, "message_m data :\n"));
 	internal_dump_hex(
-		get_managed_buffer(&spdm_context->transcript.message_m),
-		get_managed_buffer_size(&spdm_context->transcript.message_m));
-
+		l1l2_buffer, *l1l2_buffer_size);
 	// debug only
 	spdm_hash_all(
 		spdm_context->connection_info.algorithm.base_hash_algo,
-		get_managed_buffer(&spdm_context->transcript.message_m),
-		get_managed_buffer_size(&spdm_context->transcript.message_m),
-		hash_data);
+		l1l2_buffer, *l1l2_buffer_size, hash_data);
 	DEBUG((DEBUG_INFO, "l1l2 hash - "));
 	internal_dump_data(hash_data, hash_size);
 	DEBUG((DEBUG_INFO, "\n"));
-
-	*l1l2_buffer_size =
-		get_managed_buffer_size(&spdm_context->transcript.message_m);
-	copy_mem(l1l2_buffer,
-		 get_managed_buffer(&spdm_context->transcript.message_m),
-		 *l1l2_buffer_size);
 
 	return TRUE;
 }
@@ -847,12 +855,14 @@ spdm_generate_measurement_summary_hash(IN spdm_context_t *spdm_context,
   This function generates the measurement signature to response message based upon l1l2.
 
   @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info					A pointer to the SPDM session context.
   @param  signature                    The buffer to store the signature.
 
   @retval TRUE  measurement signature is generated.
   @retval FALSE measurement signature is not generated.
 **/
 boolean spdm_generate_measurement_signature(IN spdm_context_t *spdm_context,
+						IN spdm_session_info_t *session_info,
 					    OUT uint8 *signature)
 {
 	uintn signature_size;
@@ -861,7 +871,7 @@ boolean spdm_generate_measurement_signature(IN spdm_context_t *spdm_context,
 	uintn l1l2_buffer_size;
 
 	l1l2_buffer_size = sizeof(l1l2_buffer);
-	result = spdm_calculate_l1l2(spdm_context, &l1l2_buffer_size,
+	result = spdm_calculate_l1l2(spdm_context, session_info, &l1l2_buffer_size,
 				     l1l2_buffer);
 	if (!result) {
 		return FALSE;
@@ -880,6 +890,7 @@ boolean spdm_generate_measurement_signature(IN spdm_context_t *spdm_context,
   This function verifies the measurement signature based upon l1l2.
 
   @param  spdm_context                  A pointer to the SPDM context.
+  @param  session_info					A pointer to the SPDM session context.
   @param  sign_data                     The signature data buffer.
   @param  sign_data_size                 size in bytes of the signature data buffer.
 
@@ -887,6 +898,7 @@ boolean spdm_generate_measurement_signature(IN spdm_context_t *spdm_context,
   @retval FALSE signature verification fail.
 **/
 boolean spdm_verify_measurement_signature(IN spdm_context_t *spdm_context,
+					  IN spdm_session_info_t *session_info,
 					  IN void *sign_data,
 					  IN uintn sign_data_size)
 {
@@ -900,7 +912,7 @@ boolean spdm_verify_measurement_signature(IN spdm_context_t *spdm_context,
 	uintn l1l2_buffer_size;
 
 	l1l2_buffer_size = sizeof(l1l2_buffer);
-	result = spdm_calculate_l1l2(spdm_context, &l1l2_buffer_size,
+	result = spdm_calculate_l1l2(spdm_context, session_info, &l1l2_buffer_size,
 				     l1l2_buffer);
 	if (!result) {
 		return FALSE;
