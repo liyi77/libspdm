@@ -3188,7 +3188,7 @@ bool libspdm_ec_get_pub_key(void *ec_context, uint8_t *public_key,
  * @retval  false  EC key components are not valid.
  *
  **/
-bool libspdm_ec_check_key(const void *ec_context);
+bool libspdm_ec_check_key(void *ec_context);
 
 /**
  * Generates EC key and returns EC public key (X, Y).

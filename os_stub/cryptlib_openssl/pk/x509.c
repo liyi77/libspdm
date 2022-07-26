@@ -1621,12 +1621,8 @@ bool libspdm_ec_get_public_key_from_x509(const uint8_t *cert, size_t cert_size,
         goto done;
     }
 
-
-    /* Duplicate EC context from the retrieved EVP_PKEY.*/
-
-    if ((*ec_context = EC_KEY_dup(EVP_PKEY_get0_EC_KEY(pkey))) != NULL) {
-        res = true;
-    }
+    *ec_context = pkey;
+    res = true;
 
 done:
 
@@ -1634,10 +1630,6 @@ done:
 
     if (x509_cert != NULL) {
         X509_free(x509_cert);
-    }
-
-    if (pkey != NULL) {
-        EVP_PKEY_free(pkey);
     }
 
     return res;
@@ -2464,7 +2456,8 @@ bool libspdm_gen_x509_csr(size_t hash_nid, size_t asym_nid,
     case LIBSPDM_CRYPTO_NID_ECDSA_NIST_P256:
     case LIBSPDM_CRYPTO_NID_ECDSA_NIST_P384:
     case LIBSPDM_CRYPTO_NID_ECDSA_NIST_P521:
-        ret = EVP_PKEY_set1_EC_KEY(private_key, (EC_KEY *)context);
+        private_key = (EVP_PKEY *)context;
+        ret = EVP_PKEY_up_ref((EVP_PKEY *)context);
         if (ret != 1) {
             goto free_all;
         }
