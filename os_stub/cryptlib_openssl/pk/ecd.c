@@ -28,9 +28,7 @@
  **/
 void *libspdm_ecd_new_by_nid(size_t nid)
 {
-    EVP_PKEY_CTX *pkey_ctx;
     EVP_PKEY *pkey;
-    int32_t result;
     int32_t openssl_pkey_type;
 
     switch (nid) {
@@ -50,24 +48,9 @@ void *libspdm_ecd_new_by_nid(size_t nid)
         return NULL;
     }
 
-    pkey_ctx = EVP_PKEY_CTX_new_id(openssl_pkey_type, NULL);
-    if (pkey_ctx == NULL) {
-        return NULL;
-    }
-    result = EVP_PKEY_keygen_init(pkey_ctx);
-    if (result <= 0) {
-        EVP_PKEY_CTX_free(pkey_ctx);
-        return NULL;
-    }
     pkey = EVP_PKEY_new();
 
     EVP_PKEY_set_type(pkey, openssl_pkey_type);
-    result = EVP_PKEY_keygen(pkey_ctx, &pkey);
-    if (result <= 0) {
-        EVP_PKEY_CTX_free(pkey_ctx);
-        return NULL;
-    }
-    EVP_PKEY_CTX_free(pkey_ctx);
 
     return (void *)pkey;
 }
