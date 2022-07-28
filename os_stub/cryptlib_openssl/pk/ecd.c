@@ -134,9 +134,11 @@ bool libspdm_ecd_get_pub_key(void *ecd_context, uint8_t *public_key,
     pkey = (EVP_PKEY *)ecd_context;
     switch (EVP_PKEY_id(pkey)) {
     case EVP_PKEY_ED25519:
+    case EVP_PKEY_X25519:
         final_pub_key_size = 32;
         break;
     case EVP_PKEY_ED448:
+    case EVP_PKEY_X448:
         final_pub_key_size = 57;
         break;
     default:
@@ -231,6 +233,93 @@ bool libspdm_ecd_generate_key(void *ecd_context, uint8_t *public_key,
 
     /* TBD*/
     return true;
+}
+
+/**
+ * Computes exchanged common key.
+ *
+ * Given peer's public key (X, Y), this function computes the exchanged common key,
+ * based on its own context including value of curve parameter and random secret.
+ * X is the first half of peer_public with size being peer_public_size / 2,
+ * Y is the second half of peer_public with size being peer_public_size / 2.
+ *
+ * If ec_context is NULL, then return false.
+ * If peer_public is NULL, then return false.
+ * If peer_public_size is 0, then return false.
+ * If key is NULL, then return false.
+ * If key_size is not large enough, then return false.
+ *
+ *
+ * @param[in, out]  ec_context          Pointer to the EC context.
+ * @param[in]       peer_public         Pointer to the peer's public X,Y.
+ * @param[in]       peer_public_size     size of peer's public X,Y in bytes.
+ * @param[out]      key                Pointer to the buffer to receive generated key.
+ * @param[in, out]  key_size            On input, the size of key buffer in bytes.
+ *                                    On output, the size of data returned in key buffer in bytes.
+ *
+ * @retval true   EC exchanged key generation succeeded.
+ * @retval false  EC exchanged key generation failed.
+ * @retval false  key_size is not large enough.
+ *
+ **/
+bool libspdm_ecd_compute_key(void *ecd_context, const uint8_t *peer_public,
+                            size_t peer_public_size, uint8_t *key,
+                            size_t *key_size)
+{
+    bool ret_val;
+    EVP_PKEY *pkey;
+    EVP_PKEY *peer_pkey;
+    EVP_PKEY_CTX *pkey_ctx;
+    size_t secret_size;
+
+    if (ecd_context == NULL || peer_public == NULL || key_size == NULL) {
+        return false;
+    }
+
+    if (key == NULL && *key_size != 0) {
+        return false;
+    }
+
+    ret_val = false;
+    pkey = (EVP_PKEY *)ecd_context;
+    pkey_ctx = NULL;
+
+    peer_pkey = EVP_PKEY_new_raw_public_key(EVP_PKEY_id(pkey), NULL, peer_public, peer_public_size);
+    if (peer_pkey == NULL) {
+        return false;
+    }
+
+    // ED need public key check also?
+    // if (libspdm_ec_check_key(peer_pkey) != true) {
+    //     goto fail;
+    // }
+
+    pkey_ctx = EVP_PKEY_CTX_new(pkey, NULL);
+    if (pkey_ctx == NULL) {
+        goto fail;
+    }
+
+    if ((EVP_PKEY_derive_init(pkey_ctx) != 1) ||
+        (EVP_PKEY_derive_set_peer(pkey_ctx, peer_pkey) != 1) ||
+        (EVP_PKEY_derive(pkey_ctx, NULL, &secret_size) != 1)) {
+        goto fail;
+    }
+
+    if (*key_size < secret_size) {
+        *key_size = secret_size;
+        goto fail;
+    }
+    *key_size = secret_size;
+
+    if (EVP_PKEY_derive(pkey_ctx, key, key_size) != 1) {
+        goto fail;
+    }
+
+    ret_val = true;
+fail:
+    EVP_PKEY_free(peer_pkey);
+    EVP_PKEY_CTX_free(pkey_ctx);
+    return ret_val;
 }
 
 /**

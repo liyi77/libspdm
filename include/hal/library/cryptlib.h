@@ -3415,6 +3415,10 @@ bool libspdm_ecd_check_key(const void *ecd_context);
 bool libspdm_ecd_generate_key(void *ecd_context, uint8_t *public_key,
                               size_t *public_key_size);
 
+bool libspdm_ecd_compute_key(void *ecd_context, const uint8_t *peer_public,
+                            size_t peer_public_size, uint8_t *key,
+                            size_t *key_size);
+
 /**
  * Carries out the Ed-DSA signature.
  *

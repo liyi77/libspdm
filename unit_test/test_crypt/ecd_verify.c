@@ -32,7 +32,7 @@ bool libspdm_validate_crypt_ecd(void)
     size_t sig2_size;
     bool status;
 
-    libspdm_my_print("\nCrypto Ed-DSA Signing Verification Testing:\n");
+    libspdm_my_print("\nCrypto Ed-DH Verification Testing:\n");
 
     /* Initialize key length*/
 
@@ -40,6 +40,81 @@ bool libspdm_validate_crypt_ecd(void)
     public2_length = sizeof(public2);
     key1_length = sizeof(key1);
     key2_length = sizeof(key2);
+
+    libspdm_my_print("- Context1 ... ");
+    ecd1 = libspdm_ecd_new_by_nid(LIBSPDM_CRYPTO_NID_CURVE_X25519);
+    if (ecd1 == NULL) {
+        libspdm_my_print("[Fail]");
+        goto Exit;
+    }
+
+    libspdm_my_print("Context2 ... ");
+    ecd2 = libspdm_ecd_new_by_nid(LIBSPDM_CRYPTO_NID_CURVE_X25519);
+    if (ecd2 == NULL) {
+        libspdm_my_print("[Fail]");
+        goto Exit;
+    }
+
+    /* Verify Ed-DH*/
+    libspdm_my_print("Generate key1 ... ");
+    status = libspdm_ecd_generate_key(ecd1, public1, &public1_length);
+    if (!status || public1_length != 32) {
+        libspdm_my_print("[Fail]");
+        libspdm_ec_free(ecd1);
+        libspdm_ec_free(ecd2);
+        return false;
+    }
+
+    libspdm_my_print("Generate key2 ... ");
+    status = libspdm_ecd_generate_key(ecd2, public2, &public2_length);
+    if (!status || public2_length != 32) {
+        libspdm_my_print("[Fail]");
+        libspdm_ec_free(ecd1);
+        libspdm_ec_free(ecd2);
+        return false;
+    }
+
+    libspdm_my_print("Compute key1 ... ");
+    status = libspdm_ecd_compute_key(ecd1, public2, public2_length, key1,
+                                    &key1_length);
+    if (!status || key1_length != 32) {
+        libspdm_my_print("[Fail]");
+        libspdm_ec_free(ecd1);
+        libspdm_ec_free(ecd2);
+        return false;
+    }
+
+    libspdm_my_print("Compute key2 ... ");
+    status = libspdm_ecd_compute_key(ecd2, public1, public1_length, key2,
+                                    &key2_length);
+    if (!status || key2_length != 32) {
+        libspdm_my_print("[Fail]");
+        libspdm_ec_free(ecd1);
+        libspdm_ec_free(ecd2);
+        return false;
+    }
+
+    libspdm_my_print("Compare Keys ... ");
+    if (key1_length != key2_length) {
+        libspdm_my_print("[Fail]");
+        libspdm_ec_free(ecd1);
+        libspdm_ec_free(ecd2);
+        return false;
+    }
+
+    if (libspdm_const_compare_mem(key1, key2, key1_length) != 0) {
+        libspdm_my_print("[Fail]");
+        libspdm_ec_free(ecd1);
+        libspdm_ec_free(ecd2);
+        return false;
+    } else {
+        libspdm_my_print("[Pass]\n");
+    }
+
+    libspdm_ec_free(ecd1);
+    libspdm_ec_free(ecd2);
+
+    libspdm_my_print("\nCrypto Ed-DSA Signing Verification Testing:\n");
 
     libspdm_my_print("- Context1 ... ");
     ecd1 = libspdm_ecd_new_by_nid(LIBSPDM_CRYPTO_NID_EDDSA_ED25519);
