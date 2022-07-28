@@ -34,6 +34,12 @@ void *libspdm_ecd_new_by_nid(size_t nid)
     int32_t openssl_pkey_type;
 
     switch (nid) {
+    case LIBSPDM_CRYPTO_NID_CURVE_X25519:
+        openssl_pkey_type = EVP_PKEY_X25519;
+        break;
+    case LIBSPDM_CRYPTO_NID_CURVE_X448:
+        openssl_pkey_type = EVP_PKEY_X448;
+        break;
     case LIBSPDM_CRYPTO_NID_EDDSA_ED25519:
         openssl_pkey_type = EVP_PKEY_ED25519;
         break;
@@ -53,7 +59,9 @@ void *libspdm_ecd_new_by_nid(size_t nid)
         EVP_PKEY_CTX_free(pkey_ctx);
         return NULL;
     }
-    pkey = NULL;
+    pkey = EVP_PKEY_new();
+
+    EVP_PKEY_set_type(pkey, openssl_pkey_type);
     result = EVP_PKEY_keygen(pkey_ctx, &pkey);
     if (result <= 0) {
         EVP_PKEY_CTX_free(pkey_ctx);
@@ -190,6 +198,37 @@ bool libspdm_ecd_check_key(const void *ecd_context)
 bool libspdm_ecd_generate_key(void *ecd_context, uint8_t *public_key,
                               size_t *public_key_size)
 {
+    EVP_PKEY_CTX *pkey_ctx;
+    EVP_PKEY *pkey;
+    int32_t result;
+    int32_t openssl_pkey_type;
+
+    pkey = ecd_context;
+    openssl_pkey_type = EVP_PKEY_id(pkey);
+
+    pkey_ctx = EVP_PKEY_CTX_new_id(openssl_pkey_type, NULL);
+    if (pkey_ctx == NULL) {
+        return false;
+    }
+    result = EVP_PKEY_keygen_init(pkey_ctx);
+    if (result <= 0) {
+        EVP_PKEY_CTX_free(pkey_ctx);
+        return false;
+    }
+
+    result = EVP_PKEY_keygen(pkey_ctx, &pkey);
+    if (result <= 0) {
+        EVP_PKEY_CTX_free(pkey_ctx);
+        return false;
+    }
+
+    if (!libspdm_ecd_get_pub_key(ecd_context, public_key, public_key_size)) {
+        EVP_PKEY_CTX_free(pkey_ctx);
+        return false;
+    }
+
+    EVP_PKEY_CTX_free(pkey_ctx);
+
     /* TBD*/
     return true;
 }
