@@ -214,34 +214,31 @@ bool libspdm_ecd_generate_key(void *ecd_context, uint8_t *public_key,
 
     EVP_PKEY_CTX_free(pkey_ctx);
 
-    /* TBD*/
     return true;
 }
 
 /**
  * Computes exchanged common key.
  *
- * Given peer's public key (X, Y), this function computes the exchanged common key,
- * based on its own context including value of curve parameter and random secret.
- * X is the first half of peer_public with size being peer_public_size / 2,
- * Y is the second half of peer_public with size being peer_public_size / 2.
+ * For ed25519, the public_size is 32.
+ * For ed448, the public_size is 57.
  *
- * If ec_context is NULL, then return false.
+ * If ecd_context is NULL, then return false.
  * If peer_public is NULL, then return false.
  * If peer_public_size is 0, then return false.
  * If key is NULL, then return false.
  * If key_size is not large enough, then return false.
  *
  *
- * @param[in, out]  ec_context          Pointer to the EC context.
+ * @param[in, out]  ecd_context          Pointer to the ECD context.
  * @param[in]       peer_public         Pointer to the peer's public X,Y.
  * @param[in]       peer_public_size     size of peer's public X,Y in bytes.
  * @param[out]      key                Pointer to the buffer to receive generated key.
  * @param[in, out]  key_size            On input, the size of key buffer in bytes.
  *                                    On output, the size of data returned in key buffer in bytes.
  *
- * @retval true   EC exchanged key generation succeeded.
- * @retval false  EC exchanged key generation failed.
+ * @retval true   ECD exchanged key generation succeeded.
+ * @retval false  ECD exchanged key generation failed.
  * @retval false  key_size is not large enough.
  *
  **/
@@ -271,11 +268,6 @@ bool libspdm_ecd_compute_key(void *ecd_context, const uint8_t *peer_public,
     if (peer_pkey == NULL) {
         return false;
     }
-
-    // ED need public key check also?
-    // if (libspdm_ec_check_key(peer_pkey) != true) {
-    //     goto fail;
-    // }
 
     pkey_ctx = EVP_PKEY_CTX_new(pkey, NULL);
     if (pkey_ctx == NULL) {

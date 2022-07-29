@@ -126,6 +126,37 @@ bool libspdm_ecd_generate_key(void *ecd_context, uint8_t *public_key,
 }
 
 /**
+ * Computes exchanged common key.
+ *
+ * For ed25519, the public_size is 32.
+ * For ed448, the public_size is 57.
+ *
+ * If ecd_context is NULL, then return false.
+ * If peer_public is NULL, then return false.
+ * If peer_public_size is 0, then return false.
+ * If key is NULL, then return false.
+ * If key_size is not large enough, then return false.
+ *
+ *
+ * @param[in, out]  ecd_context          Pointer to the ECD context.
+ * @param[in]       peer_public         Pointer to the peer's public X,Y.
+ * @param[in]       peer_public_size     size of peer's public X,Y in bytes.
+ * @param[out]      key                Pointer to the buffer to receive generated key.
+ * @param[in, out]  key_size            On input, the size of key buffer in bytes.
+ *                                    On output, the size of data returned in key buffer in bytes.
+ *
+ * @retval true   ECD exchanged key generation succeeded.
+ * @retval false  ECD exchanged key generation failed.
+ * @retval false  key_size is not large enough.
+ *
+ **/
+bool libspdm_ecd_compute_key(void *ecd_context, const uint8_t *peer_public,
+                            size_t peer_public_size, uint8_t *key,
+                            size_t *key_size)
+{
+    return false;
+}
+/**
  * Carries out the Ed-DSA signature.
  *
  * This function carries out the Ed-DSA signature.
