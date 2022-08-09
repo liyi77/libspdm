@@ -22,6 +22,7 @@
 #include <openssl/rsa.h>
 #include <openssl/objects.h>
 #include <openssl/evp.h>
+#include <openssl/core_names.h>
 
 /**
  * Allocates and initializes one RSA context for subsequent use.
@@ -35,7 +36,7 @@ void *libspdm_rsa_new(void)
 
     /* Allocates & Initializes RSA context by OpenSSL RSA_new()*/
 
-    return (void *)RSA_new();
+    return (void *)EVP_PKEY_CTX_new_id(EVP_PKEY_RSA, NULL);
 }
 
 /**
@@ -49,7 +50,7 @@ void libspdm_rsa_free(void *rsa_context)
 
     /* Free OpenSSL RSA context*/
 
-    RSA_free((RSA *)rsa_context);
+    EVP_PKEY_CTX_free((EVP_PKEY_CTX *)rsa_context);
 }
 
 /**
@@ -77,16 +78,18 @@ void libspdm_rsa_free(void *rsa_context)
 bool libspdm_rsa_set_key(void *rsa_context, const libspdm_rsa_key_tag_t key_tag,
                          const uint8_t *big_number, uintn bn_size)
 {
-    RSA *rsa_key;
+    /**
+     * @RSA PARAM TABLE
+     * P:    OSSL_PKEY_PARAM_RSA_FACTOR1
+     * Q:    OSSL_PKEY_PARAM_RSA_FACTOR2
+     * DP:   OSSL_PKEY_PARAM_RSA_EXPONENT1
+     * DQ:   OSSL_PKEY_PARAM_RSA_EXPONENT2
+     * QINV: OSSL_PKEY_PARAM_RSA_COEFFICIENT1
+     */
+
+    EVP_PKEY *rsa_key;
     bool status;
-    BIGNUM *bn_n, *bn_n_tmp;
-    BIGNUM *bn_e, *bn_e_tmp;
-    BIGNUM *bn_d, *bn_d_tmp;
-    BIGNUM *bn_p, *bn_p_tmp;
-    BIGNUM *bn_q, *bn_q_tmp;
-    BIGNUM *bn_dp, *bn_dp_tmp;
-    BIGNUM *bn_dq, *bn_dq_tmp;
-    BIGNUM *bn_q_inv, *bn_q_inv_tmp;
+    BIGNUM *bn;
 
 
     /* Check input parameters.*/
@@ -95,36 +98,14 @@ bool libspdm_rsa_set_key(void *rsa_context, const libspdm_rsa_key_tag_t key_tag,
         return false;
     }
 
-    bn_n = NULL;
-    bn_e = NULL;
-    bn_d = NULL;
-    bn_p = NULL;
-    bn_q = NULL;
-    bn_dp = NULL;
-    bn_dq = NULL;
-    bn_q_inv = NULL;
-
-    bn_n_tmp = NULL;
-    bn_e_tmp = NULL;
-    bn_d_tmp = NULL;
-    bn_p_tmp = NULL;
-    bn_q_tmp = NULL;
-    bn_dp_tmp = NULL;
-    bn_dq_tmp = NULL;
-    bn_q_inv_tmp = NULL;
-
+    bn = NULL;
+    if (BN_bin2bn(big_number, (uint32_t)bn_size, bn) == NULL) {
+        return false;
+    }
 
     /* Retrieve the components from RSA object.*/
 
-    rsa_key = (RSA *)rsa_context;
-    RSA_get0_key(rsa_key, (const BIGNUM **)&bn_n, (const BIGNUM **)&bn_e,
-                 (const BIGNUM **)&bn_d);
-    RSA_get0_factors(rsa_key, (const BIGNUM **)&bn_p,
-                     (const BIGNUM **)&bn_q);
-    RSA_get0_crt_params(rsa_key, (const BIGNUM **)&bn_dp,
-                        (const BIGNUM **)&bn_dq,
-                        (const BIGNUM **)&bn_q_inv);
-
+    rsa_key = EVP_PKEY_CTX_get0_pkey((EVP_PKEY_CTX *)rsa_context);
 
     /* Set RSA key Components by converting octet string to OpenSSL BN representation.
      * NOTE: For RSA public key (used in signature verification), only public components
@@ -135,83 +116,23 @@ bool libspdm_rsa_set_key(void *rsa_context, const libspdm_rsa_key_tag_t key_tag,
     /* RSA public Modulus (N), public Exponent (e) and Private Exponent (d)*/
 
     case LIBSPDM_RSA_KEY_N:
+        EVP_PKEY_set_bn_param(rsa_key, OSSL_PKEY_PARAM_RSA_N, bn);
+        break;
     case LIBSPDM_RSA_KEY_E:
+        EVP_PKEY_set_bn_param(rsa_key, OSSL_PKEY_PARAM_RSA_E, bn);
+        break;
     case LIBSPDM_RSA_KEY_D:
-        if (bn_n == NULL) {
-            bn_n = BN_new();
-            bn_n_tmp = bn_n;
-        }
-        if (bn_e == NULL) {
-            bn_e = BN_new();
-            bn_e_tmp = bn_e;
-        }
-        if (bn_d == NULL) {
-            bn_d = BN_new();
-            bn_d_tmp = bn_d;
-        }
-
-        if ((bn_n == NULL) || (bn_e == NULL) || (bn_d == NULL)) {
-            status = false;
-            goto err;
-        }
-
-        switch (key_tag) {
-        case LIBSPDM_RSA_KEY_N:
-            bn_n = BN_bin2bn(big_number, (uint32_t)bn_size, bn_n);
-            break;
-        case LIBSPDM_RSA_KEY_E:
-            bn_e = BN_bin2bn(big_number, (uint32_t)bn_size, bn_e);
-            break;
-        case LIBSPDM_RSA_KEY_D:
-            bn_d = BN_bin2bn(big_number, (uint32_t)bn_size, bn_d);
-            break;
-        default:
-            status = false;
-            goto err;
-        }
-        if (RSA_set0_key(rsa_key, BN_dup(bn_n), BN_dup(bn_e),
-                         BN_dup(bn_d)) == 0) {
-            status = false;
-            goto err;
-        }
-
+        EVP_PKEY_set_bn_param(rsa_key, OSSL_PKEY_PARAM_RSA_D, bn);
         break;
 
 
     /* RSA Secret prime Factor of Modulus (p and q)*/
 
     case LIBSPDM_RSA_KEY_P:
+        EVP_PKEY_set_bn_param(rsa_key, OSSL_PKEY_PARAM_RSA_FACTOR1, bn);
+        break;
     case LIBSPDM_RSA_KEY_Q:
-        if (bn_p == NULL) {
-            bn_p = BN_new();
-            bn_p_tmp = bn_p;
-        }
-        if (bn_q == NULL) {
-            bn_q = BN_new();
-            bn_q_tmp = bn_q;
-        }
-        if ((bn_p == NULL) || (bn_q == NULL)) {
-            status = false;
-            goto err;
-        }
-
-        switch (key_tag) {
-        case LIBSPDM_RSA_KEY_P:
-            bn_p = BN_bin2bn(big_number, (uint32_t)bn_size, bn_p);
-            break;
-        case LIBSPDM_RSA_KEY_Q:
-            bn_q = BN_bin2bn(big_number, (uint32_t)bn_size, bn_q);
-            break;
-        default:
-            status = false;
-            goto err;
-        }
-        if (RSA_set0_factors(rsa_key, BN_dup(bn_p), BN_dup(bn_q)) ==
-            0) {
-            status = false;
-            goto err;
-        }
-
+        EVP_PKEY_set_bn_param(rsa_key, OSSL_PKEY_PARAM_RSA_FACTOR2, bn);
         break;
 
 
@@ -219,46 +140,13 @@ bool libspdm_rsa_set_key(void *rsa_context, const libspdm_rsa_key_tag_t key_tag,
      * and CRT Coefficient (== 1/q mod p)*/
 
     case LIBSPDM_RSA_KEY_DP:
+        EVP_PKEY_set_bn_param(rsa_key, OSSL_PKEY_PARAM_RSA_EXPONENT1, bn);
+        break;
     case LIBSPDM_RSA_KEY_DQ:
+        EVP_PKEY_set_bn_param(rsa_key, OSSL_PKEY_PARAM_RSA_EXPONENT2, bn);
+        break;
     case LIBSPDM_RSA_KEY_Q_INV:
-        if (bn_dp == NULL) {
-            bn_dp = BN_new();
-            bn_dp_tmp = bn_dp;
-        }
-        if (bn_dq == NULL) {
-            bn_dq = BN_new();
-            bn_dq_tmp = bn_dq;
-        }
-        if (bn_q_inv == NULL) {
-            bn_q_inv = BN_new();
-            bn_q_inv_tmp = bn_q_inv;
-        }
-        if ((bn_dp == NULL) || (bn_dq == NULL) || (bn_q_inv == NULL)) {
-            status = false;
-            goto err;
-        }
-
-        switch (key_tag) {
-        case LIBSPDM_RSA_KEY_DP:
-            bn_dp = BN_bin2bn(big_number, (uint32_t)bn_size, bn_dp);
-            break;
-        case LIBSPDM_RSA_KEY_DQ:
-            bn_dq = BN_bin2bn(big_number, (uint32_t)bn_size, bn_dq);
-            break;
-        case LIBSPDM_RSA_KEY_Q_INV:
-            bn_q_inv = BN_bin2bn(big_number, (uint32_t)bn_size,
-                                 bn_q_inv);
-            break;
-        default:
-            status = false;
-            goto err;
-        }
-        if (RSA_set0_crt_params(rsa_key, BN_dup(bn_dp), BN_dup(bn_dq),
-                                BN_dup(bn_q_inv)) == 0) {
-            status = false;
-            goto err;
-        }
-
+        EVP_PKEY_set_bn_param(rsa_key, OSSL_PKEY_PARAM_RSA_COEFFICIENT1, bn);
         break;
 
     default:
@@ -269,14 +157,7 @@ bool libspdm_rsa_set_key(void *rsa_context, const libspdm_rsa_key_tag_t key_tag,
     status = true;
 
 err:
-    BN_free(bn_n_tmp);
-    BN_free(bn_e_tmp);
-    BN_free(bn_d_tmp);
-    BN_free(bn_p_tmp);
-    BN_free(bn_q_tmp);
-    BN_free(bn_dp_tmp);
-    BN_free(bn_dq_tmp);
-    BN_free(bn_q_inv_tmp);
+    BN_free(bn);
 
     return status;
 }
@@ -308,6 +189,8 @@ bool libspdm_rsa_pkcs1_verify_with_nid(void *rsa_context, uintn hash_nid,
 {
     int32_t digest_type;
     uint8_t *sig_buf;
+    EVP_PKEY *rsa_key;
+    EVP_MD *md;
 
 
     /* Check input parameters.*/
@@ -367,10 +250,18 @@ bool libspdm_rsa_pkcs1_verify_with_nid(void *rsa_context, uintn hash_nid,
         return false;
     }
 
+    rsa_key = (EVP_PKEY *)rsa_context;
     sig_buf = (uint8_t *)signature;
-    return (bool)RSA_verify(digest_type, message_hash, (uint32_t)hash_size,
-                            sig_buf, (uint32_t)sig_size,
-                            (RSA *)rsa_context);
+
+    /* Initialize context for verification and set options. */
+    if (EVP_PKEY_verify_init(rsa_key) == 0) {
+        return false;
+    }
+
+    /* Verify signature. */
+    return (bool)EVP_PKEY_verify(rsa_key, sig_buf, (uint32_t)sig_size,
+                        message_hash, (uint32_t)hash_size);
+
 }
 
 /**
@@ -399,11 +290,9 @@ bool libspdm_rsa_pss_verify(void *rsa_context, uintn hash_nid,
                             const uint8_t *message_hash, uintn hash_size,
                             const uint8_t *signature, uintn sig_size)
 {
-    RSA *rsa;
-    bool result;
-    int32_t size;
     const EVP_MD *evp_md;
-    void *buffer;
+    uint8_t *sig_buf;
+    EVP_PKEY *rsa_key;
 
     if (rsa_context == NULL || message_hash == NULL || signature == NULL) {
         return false;
@@ -466,21 +355,29 @@ bool libspdm_rsa_pss_verify(void *rsa_context, uintn hash_nid,
         return false;
     }
 
-    buffer = allocate_pool(size);
-    if (buffer == NULL) {
+    /* Initialize context for verification and set options. */
+    if (EVP_PKEY_verify_init(rsa_key) == 0) {
         return false;
     }
 
-    size = RSA_public_decrypt(size, signature, buffer, rsa, RSA_NO_PADDING);
-    if (size <= 0) {
-        free_pool(buffer);
+    if (EVP_PKEY_CTX_set_signature_md(rsa_key, evp_md) == 0) {
         return false;
     }
-    LIBSPDM_ASSERT(sig_size == (uintn)size);
 
-    result = (bool)RSA_verify_PKCS1_PSS(rsa, message_hash, evp_md,
-                                        buffer, RSA_PSS_SALTLEN_DIGEST);
-    free_pool(buffer);
+    if (EVP_PKEY_CTX_set_rsa_padding(rsa_key, RSA_PKCS1_PSS_PADDING) == 0) {
+        return false;
+    }
+
+    if (EVP_PKEY_CTX_set_rsa_pss_saltlen(rsa_key, RSA_PKCS1_PSS_PADDING) == 0) {
+        return false;
+    }
+
+    /* Verify signature. */
+    return (bool)EVP_PKEY_verify(rsa_key, sig_buf, (uint32_t)sig_size,
+                        message_hash, (uint32_t)hash_size);
+
+
+
 
     return result;
 }
