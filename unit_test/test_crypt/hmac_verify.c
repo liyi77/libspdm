@@ -43,6 +43,7 @@ GLOBAL_REMOVE_IF_UNREFERENCED uint8_t m_libspdm_hmac_sha256_digest[] = {
 return_status libspdm_validate_crypt_hmac(void)
 {
     void *hmac_ctx;
+    void *hmac_ctx_copy;
     uint8_t digest[MAX_DIGEST_SIZE];
     bool status;
 
@@ -55,6 +56,12 @@ return_status libspdm_validate_crypt_hmac(void)
     libspdm_zero_mem(digest, MAX_DIGEST_SIZE);
     hmac_ctx = libspdm_hmac_sha256_new();
     if (hmac_ctx == NULL) {
+        libspdm_my_print("[Fail]");
+        return RETURN_ABORTED;
+    }
+
+    hmac_ctx_copy = libspdm_hmac_sha256_new();
+    if (hmac_ctx_copy == NULL) {
         libspdm_my_print("[Fail]");
         return RETURN_ABORTED;
     }
@@ -74,6 +81,14 @@ return_status libspdm_validate_crypt_hmac(void)
         return RETURN_ABORTED;
     }
 
+    libspdm_my_print("Duplicate... ");
+    status = libspdm_hmac_sha256_duplicate(hmac_ctx, hmac_ctx_copy);
+    if (!status) {
+        libspdm_my_print("[Fail]");
+        free_pool(hmac_ctx);
+        return RETURN_ABORTED;
+    }
+
     libspdm_my_print("Finalize... ");
     status = libspdm_hmac_sha256_final(hmac_ctx, digest);
     if (!status) {
@@ -81,8 +96,6 @@ return_status libspdm_validate_crypt_hmac(void)
         free_pool(hmac_ctx);
         return RETURN_ABORTED;
     }
-
-    free_pool(hmac_ctx);
 
     libspdm_my_print("Check value... ");
     if (libspdm_const_compare_mem(digest, m_libspdm_hmac_sha256_digest,
@@ -92,6 +105,39 @@ return_status libspdm_validate_crypt_hmac(void)
         return RETURN_ABORTED;
     }
 
+    libspdm_my_print("HMAC ALL... ");
+    status = libspdm_hmac_sha256_all(m_libspdm_hmac_data, 8, m_libspdm_hmac_sha256_key, 20, digest);
+    if (!status) {
+        libspdm_my_print("[Fail]");
+        free_pool(hmac_ctx);
+        return RETURN_ABORTED;
+    }
+
+    libspdm_my_print("Check value... ");
+    if (libspdm_const_compare_mem(digest, m_libspdm_hmac_sha256_digest,
+                                  LIBSPDM_SHA256_DIGEST_SIZE) !=
+        0) {
+        libspdm_my_print("[Fail]");
+        return RETURN_ABORTED;
+    }
+
+    libspdm_my_print("Duplicate Finalize... ");
+    status = libspdm_hmac_sha256_final(hmac_ctx_copy, digest);
+    if (!status) {
+        libspdm_my_print("[Fail]");
+        free_pool(hmac_ctx);
+        return RETURN_ABORTED;
+    }
+
+    libspdm_my_print("Check value... ");
+    if (libspdm_const_compare_mem(digest, m_libspdm_hmac_sha256_digest,
+                                  LIBSPDM_SHA256_DIGEST_SIZE) !=
+        0) {
+        libspdm_my_print("[Fail]");
+        return RETURN_ABORTED;
+    }
+
+    free_pool(hmac_ctx);
     libspdm_my_print("[Pass]\n");
 
     libspdm_my_print("- HMAC-SHA3_256: ");

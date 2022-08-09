@@ -9,35 +9,44 @@
  **/
 
 #include "internal_crypt_lib.h"
-#include <openssl/hmac.h>
+#include <openssl/evp.h>
+#include <openssl/params.h>
+#include <openssl/types.h>
+#include <openssl/core_names.h>
 
 /**
- * Allocates and initializes one HMAC_CTX context for subsequent HMAC-MD use.
+ * Allocates and initializes one EVP_MAC_CTX context for subsequent HMAC-MD use.
  *
- * @return  Pointer to the HMAC_CTX context that has been initialized.
+ * @return  Pointer to the EVP_MAC_CTX context that has been initialized.
  *         If the allocations fails, hmac_md_new() returns NULL.
  *
  **/
 void *hmac_md_new(void)
 {
+    EVP_MAC *mac;
+    EVP_MAC_CTX *mctx; 
 
-    /* Allocates & Initializes HMAC_CTX context by OpenSSL HMAC_CTX_new()*/
+    mac = EVP_MAC_fetch(NULL, "HMAC", NULL);
+    if (mac != NULL) {
+        mctx = EVP_MAC_CTX_new(mac);
+    }
 
-    return (void *)HMAC_CTX_new();
+    EVP_MAC_free(mac);
+    return (void *)mctx;
 }
 
 /**
- * Release the specified HMAC_CTX context.
+ * Release the specified EVP_MAC_CTX context.
  *
- * @param[in]  hmac_md_ctx  Pointer to the HMAC_CTX context to be released.
+ * @param[in]  hmac_md_ctx  Pointer to the EVP_MAC_CTX context to be released.
  *
  **/
 void hmac_md_free(const void *hmac_md_ctx)
 {
 
-    /* Free OpenSSL HMAC_CTX context*/
+    /* Free OpenSSL EVP_MAC_CTX context*/
 
-    HMAC_CTX_free((HMAC_CTX *)hmac_md_ctx);
+    EVP_MAC_CTX_free((EVP_MAC_CTX *)hmac_md_ctx);
 }
 
 /**
@@ -46,7 +55,7 @@ void hmac_md_free(const void *hmac_md_ctx)
  *
  * If hmac_md_ctx is NULL, then return false.
  *
- * @param[in]   md                 message digest.
+ * @param[in]   digest_name        digest_name.
  * @param[out]  hmac_md_ctx      Pointer to HMAC-MD context.
  * @param[in]   key                Pointer to the user-supplied key.
  * @param[in]   key_size            key size in bytes.
@@ -55,23 +64,32 @@ void hmac_md_free(const void *hmac_md_ctx)
  * @retval false  The key is set unsuccessfully.
  *
  **/
-bool hmac_md_set_key(const EVP_MD *md, void *hmac_md_ctx,
+bool hmac_md_set_key(const uint8_t digest_name[], void *hmac_md_ctx,
                      const uint8_t *key, uintn key_size)
 {
+    OSSL_PARAM params[2];
 
     /* Check input parameters.*/
-
-    if (hmac_md_ctx == NULL || key_size > INT_MAX) {
+    if (digest_name == NULL || hmac_md_ctx == NULL || key_size > INT_MAX) {
         return false;
     }
 
-    if (HMAC_Init_ex((HMAC_CTX *)hmac_md_ctx, key, (uint32_t)key_size, md,
-                     NULL) != 1) {
+    params[0] = OSSL_PARAM_construct_utf8_string(OSSL_MAC_PARAM_DIGEST, digest_name,
+                                                 sizeof(digest_name));
+    params[1] = OSSL_PARAM_construct_end();
+
+    /* Initialise the HMAC operation */
+    if (EVP_MAC_init(hmac_md_ctx, key, key_size, params) != 1) {
         return false;
     }
 
     return true;
 }
+
+// struct evp_mac_ctx_st {
+//     EVP_MAC *meth;
+//     void *algctx;
+// } /* EVP_MAC_CTX */;
 
 /**
  * Makes a copy of an existing HMAC-MD context.
@@ -88,19 +106,27 @@ bool hmac_md_set_key(const EVP_MD *md, void *hmac_md_ctx,
  **/
 bool hmac_md_duplicate(const void *hmac_md_ctx, void *new_hmac_md_ctx)
 {
+    // EVP_MAC_CTX *new_ctx;
 
-    /* Check input parameters.*/
+    // /* Check input parameters.*/
 
-    if (hmac_md_ctx == NULL || new_hmac_md_ctx == NULL) {
-        return false;
-    }
+    // if (hmac_md_ctx == NULL || new_hmac_md_ctx == NULL) {
+    //     return false;
+    // }
 
-    if (HMAC_CTX_copy((HMAC_CTX *)new_hmac_md_ctx,
-                      (HMAC_CTX *)hmac_md_ctx) != 1) {
-        return false;
-    }
+    // /* Free ctx new by hmac_md_new(). Backward compatible with openssl1.0 */
+    // EVP_MAC_CTX_free((EVP_MAC_CTX *)new_hmac_md_ctx);
 
-    return true;
+    // new_ctx = EVP_MAC_CTX_dup((EVP_MAC_CTX *)hmac_md_ctx);
+    // if (new_ctx == NULL) {
+    //     return false;
+    // }
+
+    // *((EVP_MAC_CTX *)new_hmac_md_ctx) = *new_ctx;
+    // free_pool(new_ctx);
+
+    //Blocked here, EVP_MAC_CTX have not a 'copy' function.
+    return false;
 }
 
 /**
@@ -141,7 +167,7 @@ bool hmac_md_update(void *hmac_md_ctx, const void *data,
 
     /* OpenSSL HMAC-MD digest update*/
 
-    if (HMAC_Update((HMAC_CTX *)hmac_md_ctx, data, data_size) != 1) {
+    if (EVP_MAC_update((EVP_MAC_CTX *)hmac_md_ctx, data, data_size) != 1) {
         return false;
     }
 
@@ -170,7 +196,7 @@ bool hmac_md_update(void *hmac_md_ctx, const void *data,
  **/
 bool hmac_md_final(void *hmac_md_ctx, uint8_t *hmac_value)
 {
-    uint32_t length;
+    size_t length;
 
 
     /* Check input parameters.*/
@@ -182,10 +208,10 @@ bool hmac_md_final(void *hmac_md_ctx, uint8_t *hmac_value)
 
     /* OpenSSL HMAC-MD digest finalization*/
 
-    if (HMAC_Final((HMAC_CTX *)hmac_md_ctx, hmac_value, &length) != 1) {
+    if (EVP_MAC_final((EVP_MAC_CTX *)hmac_md_ctx, NULL, &length, 0) != 1) {
         return false;
     }
-    if (HMAC_CTX_reset((HMAC_CTX *)hmac_md_ctx) != 1) {
+    if (EVP_MAC_final((EVP_MAC_CTX *)hmac_md_ctx, hmac_value, &length, length) != 1) {
         return false;
     }
 
@@ -200,7 +226,7 @@ bool hmac_md_final(void *hmac_md_ctx, uint8_t *hmac_value)
  *
  * If this interface is not supported, then return false.
  *
- * @param[in]   md          message digest.
+ * @param[in]   digest_name  digest_name.
  * @param[in]   data        Pointer to the buffer containing the data to be digested.
  * @param[in]   data_size    size of data buffer in bytes.
  * @param[in]   key         Pointer to the user-supplied key.
@@ -213,46 +239,62 @@ bool hmac_md_final(void *hmac_md_ctx, uint8_t *hmac_value)
  * @retval false  This interface is not supported.
  *
  **/
-bool hmac_md_all(const EVP_MD *md, const void *data,
+bool hmac_md_all(const uint8_t digest_name[], const void *data,
                  uintn data_size, const uint8_t *key, uintn key_size,
                  uint8_t *hmac_value)
 {
-    uint32_t length;
-    HMAC_CTX *ctx;
+    size_t length;
+    OSSL_PARAM params[2];
+    EVP_MAC *mac = NULL;
+    EVP_MAC_CTX *mctx = NULL;
     bool ret_val;
 
-    ctx = HMAC_CTX_new();
-    if (ctx == NULL) {
+    mac = EVP_MAC_fetch(NULL, "HMAC", NULL);
+    if (mac == NULL) {
         return false;
     }
 
-    ret_val = (bool)HMAC_CTX_reset(ctx);
+    mctx = EVP_MAC_CTX_new(mac);
+    if (mctx == NULL) {
+        EVP_MAC_free(mac);
+        return false;
+    }
+
+    params[0] = OSSL_PARAM_construct_utf8_string(OSSL_MAC_PARAM_DIGEST, digest_name,
+                                            sizeof(digest_name));
+    params[1] = OSSL_PARAM_construct_end();
+
+    /* Initialise the HMAC operation */
+    ret_val = (bool)EVP_MAC_init(mctx, key, key_size, params);
     if (!ret_val) {
         goto done;
     }
-    ret_val = (bool)HMAC_Init_ex(ctx, key, (uint32_t)key_size, md, NULL);
+
+    ret_val = (bool)EVP_MAC_update(mctx, data, data_size);
     if (!ret_val) {
         goto done;
     }
-    ret_val = (bool)HMAC_Update(ctx, data, data_size);
+
+    ret_val = (bool)EVP_MAC_final(mctx, NULL, &length, 0);
     if (!ret_val) {
         goto done;
     }
-    ret_val = (bool)HMAC_Final(ctx, hmac_value, &length);
+
+    ret_val = (bool)EVP_MAC_final(mctx, hmac_value, &length, length);
     if (!ret_val) {
         goto done;
     }
 
 done:
-    HMAC_CTX_free(ctx);
-
+    EVP_MAC_CTX_free(mctx);
+    EVP_MAC_free(mac);
     return ret_val;
 }
 
 /**
- * Allocates and initializes one HMAC_CTX context for subsequent HMAC-SHA256 use.
+ * Allocates and initializes one EVP_MAC_CTX context for subsequent HMAC-SHA256 use.
  *
- * @return  Pointer to the HMAC_CTX context that has been initialized.
+ * @return  Pointer to the EVP_MAC_CTX context that has been initialized.
  *         If the allocations fails, libspdm_hmac_sha256_new() returns NULL.
  *
  **/
@@ -262,9 +304,9 @@ void *libspdm_hmac_sha256_new(void)
 }
 
 /**
- * Release the specified HMAC_CTX context.
+ * Release the specified EVP_MAC_CTX context.
  *
- * @param[in]  hmac_sha256_ctx  Pointer to the HMAC_CTX context to be released.
+ * @param[in]  hmac_sha256_ctx  Pointer to the EVP_MAC_CTX context to be released.
  *
  **/
 void libspdm_hmac_sha256_free(void *hmac_sha256_ctx)
@@ -289,7 +331,7 @@ void libspdm_hmac_sha256_free(void *hmac_sha256_ctx)
 bool libspdm_hmac_sha256_set_key(void *hmac_sha256_ctx, const uint8_t *key,
                                  uintn key_size)
 {
-    return hmac_md_set_key(EVP_sha256(), hmac_sha256_ctx, key, key_size);
+    return hmac_md_set_key("SHA-256", hmac_sha256_ctx, key, key_size);
 }
 
 /**
@@ -384,14 +426,14 @@ bool libspdm_hmac_sha256_all(const void *data, uintn data_size,
                              const uint8_t *key, uintn key_size,
                              uint8_t *hmac_value)
 {
-    return hmac_md_all(EVP_sha256(), data, data_size, key, key_size,
+    return hmac_md_all("SHA-256", data, data_size, key, key_size,
                        hmac_value);
 }
 
 /**
- * Allocates and initializes one HMAC_CTX context for subsequent HMAC-SHA384 use.
+ * Allocates and initializes one EVP_MAC_CTX context for subsequent HMAC-SHA384 use.
  *
- * @return  Pointer to the HMAC_CTX context that has been initialized.
+ * @return  Pointer to the EVP_MAC_CTX context that has been initialized.
  *         If the allocations fails, libspdm_hmac_sha384_new() returns NULL.
  *
  **/
@@ -401,9 +443,9 @@ void *libspdm_hmac_sha384_new(void)
 }
 
 /**
- * Release the specified HMAC_CTX context.
+ * Release the specified EVP_MAC_CTX context.
  *
- * @param[in]  hmac_sha384_ctx  Pointer to the HMAC_CTX context to be released.
+ * @param[in]  hmac_sha384_ctx  Pointer to the EVP_MAC_CTX context to be released.
  *
  **/
 void libspdm_hmac_sha384_free(void *hmac_sha384_ctx)
@@ -430,7 +472,7 @@ void libspdm_hmac_sha384_free(void *hmac_sha384_ctx)
 bool libspdm_hmac_sha384_set_key(void *hmac_sha384_ctx, const uint8_t *key,
                                  uintn key_size)
 {
-    return hmac_md_set_key(EVP_sha384(), hmac_sha384_ctx, key, key_size);
+    return hmac_md_set_key("SHA-384", hmac_sha384_ctx, key, key_size);
 }
 
 /**
@@ -531,14 +573,14 @@ bool libspdm_hmac_sha384_all(const void *data, uintn data_size,
                              const uint8_t *key, uintn key_size,
                              uint8_t *hmac_value)
 {
-    return hmac_md_all(EVP_sha384(), data, data_size, key, key_size,
+    return hmac_md_all("SHA-384", data, data_size, key, key_size,
                        hmac_value);
 }
 
 /**
- * Allocates and initializes one HMAC_CTX context for subsequent HMAC-SHA512 use.
+ * Allocates and initializes one EVP_MAC_CTX context for subsequent HMAC-SHA512 use.
  *
- * @return  Pointer to the HMAC_CTX context that has been initialized.
+ * @return  Pointer to the EVP_MAC_CTX context that has been initialized.
  *         If the allocations fails, libspdm_hmac_sha512_new() returns NULL.
  *
  **/
@@ -548,9 +590,9 @@ void *libspdm_hmac_sha512_new(void)
 }
 
 /**
- * Release the specified HMAC_CTX context.
+ * Release the specified EVP_MAC_CTX context.
  *
- * @param[in]  hmac_sha512_ctx  Pointer to the HMAC_CTX context to be released.
+ * @param[in]  hmac_sha512_ctx  Pointer to the EVP_MAC_CTX context to be released.
  *
  **/
 void libspdm_hmac_sha512_free(void *hmac_sha512_ctx)
@@ -577,7 +619,7 @@ void libspdm_hmac_sha512_free(void *hmac_sha512_ctx)
 bool libspdm_hmac_sha512_set_key(void *hmac_sha512_ctx, const uint8_t *key,
                                  uintn key_size)
 {
-    return hmac_md_set_key(EVP_sha512(), hmac_sha512_ctx, key, key_size);
+    return hmac_md_set_key("SHA-512", hmac_sha512_ctx, key, key_size);
 }
 
 /**
@@ -678,6 +720,6 @@ bool libspdm_hmac_sha512_all(const void *data, uintn data_size,
                              const uint8_t *key, uintn key_size,
                              uint8_t *hmac_value)
 {
-    return hmac_md_all(EVP_sha512(), data, data_size, key, key_size,
+    return hmac_md_all("SHA-512", data, data_size, key, key_size,
                        hmac_value);
 }
