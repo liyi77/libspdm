@@ -21,7 +21,9 @@ SET(test_spdm_crypt_LIBRARY
     debuglib
     spdm_crypt_lib
     ${CRYPTO_LIB_PATHS}
+    ${X509_PARSER_LIB_PATHS}
     cryptlib_${CRYPTO}
+    x509_parser_${X509_PARSER}
     rnglib
     malloclib
     cmockalib
@@ -35,8 +37,10 @@ if((TOOLCHAIN STREQUAL "KLEE") OR (TOOLCHAIN STREQUAL "CBMC"))
                    $<TARGET_OBJECTS:debuglib>
                    $<TARGET_OBJECTS:spdm_crypt_lib>
                    $<TARGET_OBJECTS:${CRYPTO_LIB_PATHS}>
+                   $<TARGET_OBJECTS:${X509_PARSER_LIB_PATHS}>
                    $<TARGET_OBJECTS:rnglib>
                    $<TARGET_OBJECTS:cryptlib_${CRYPTO}>
+                   $<TARGET_OBJECTS:x509_parser_${X509_PARSER}>
                    $<TARGET_OBJECTS:malloclib>
     )
 else()

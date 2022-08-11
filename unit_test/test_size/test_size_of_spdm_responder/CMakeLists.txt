@@ -24,9 +24,12 @@ SET(test_size_of_spdm_responder_LIBRARY
     spdm_common_lib
 #    cryptstublib_dummy
 #    ${CRYPTO_LIB_PATHS}
+#    ${X509_PARSER_LIB_PATHS}
 #    cryptlib_${CRYPTO}
+#    x509_parser_${X509_PARSER}
 #    rnglib_null
     cryptlib_null
+    x509_parser_null
     malloclib_null
     spdm_crypt_lib
     spdm_secured_message_lib
@@ -45,8 +48,11 @@ if((TOOLCHAIN STREQUAL "KLEE") OR (TOOLCHAIN STREQUAL "CBMC"))
                    $<TARGET_OBJECTS:spdm_common_lib>
 #                   $<TARGET_OBJECTS:cryptstublib_dummy>
 #                   $<TARGET_OBJECTS:${CRYPTO_LIB_PATHS}>
+#                   $<TARGET_OBJECTS:${X509_PARSER_LIB_PATHS}>
 #                   $<TARGET_OBJECTS:cryptlib_${CRYPTO}>
+#                   $<TARGET_OBJECTS:x509_parser_${X509_PARSER}>
 #                   $<TARGET_OBJECTS:rnglib_null>
+                   $<TARGET_OBJECTS:x509_parser_null>
                    $<TARGET_OBJECTS:cryptlib_null>
                    $<TARGET_OBJECTS:malloclib_null>
                    $<TARGET_OBJECTS:spdm_crypt_lib>

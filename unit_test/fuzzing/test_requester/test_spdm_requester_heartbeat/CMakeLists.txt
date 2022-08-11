@@ -27,9 +27,11 @@ SET(test_spdm_requester_heartbeat_LIBRARY
     spdm_requester_lib
     spdm_common_lib
     ${CRYPTO_LIB_PATHS}
+    ${X509_PARSER_LIB_PATHS}
     rnglib
     platform_lib_null
     cryptlib_${CRYPTO}
+    x509_parser_${X509_PARSER}
     malloclib
     spdm_crypt_lib
     spdm_secured_message_lib
@@ -46,9 +48,11 @@ if((TOOLCHAIN STREQUAL "KLEE") OR (TOOLCHAIN STREQUAL "CBMC"))
                    $<TARGET_OBJECTS:spdm_requester_lib>
                    $<TARGET_OBJECTS:spdm_common_lib>
                    $<TARGET_OBJECTS:${CRYPTO_LIB_PATHS}>
+                   $<TARGET_OBJECTS:${X509_PARSER_LIB_PATHS}>
                    $<TARGET_OBJECTS:rnglib>
                    $<TARGET_OBJECTS:platform_lib_null>
                    $<TARGET_OBJECTS:cryptlib_${CRYPTO}>
+                   $<TARGET_OBJECTS:x509_parser_${X509_PARSER}>
                    $<TARGET_OBJECTS:malloclib>
                    $<TARGET_OBJECTS:spdm_crypt_lib>
                    $<TARGET_OBJECTS:spdm_secured_message_lib>

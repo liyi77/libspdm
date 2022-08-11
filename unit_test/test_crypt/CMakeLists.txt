@@ -32,8 +32,10 @@ SET(test_crypt_LIBRARY
     memlib
     debuglib
     ${CRYPTO_LIB_PATHS}
+    ${X509_PARSER_LIB_PATHS}
     rnglib
     cryptlib_${CRYPTO}
+    x509_parser_${X509_PARSER}
     malloclib
     spdm_device_secret_lib_sample
     spdm_crypt_lib
@@ -45,8 +47,10 @@ if((TOOLCHAIN STREQUAL "KLEE") OR (TOOLCHAIN STREQUAL "CBMC"))
                    $<TARGET_OBJECTS:memlib>
                    $<TARGET_OBJECTS:debuglib>
                    $<TARGET_OBJECTS:${CRYPTO_LIB_PATHS}>
+                   $<TARGET_OBJECTS:${X509_PARSER_LIB_PATHS}>
                    $<TARGET_OBJECTS:rnglib>
                    $<TARGET_OBJECTS:cryptlib_${CRYPTO}>
+                   $<TARGET_OBJECTS:x509_parser_${X509_PARSER}>
                    $<TARGET_OBJECTS:malloclib>
     )
 else()

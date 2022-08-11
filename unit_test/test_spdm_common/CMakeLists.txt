@@ -24,8 +24,10 @@ SET(test_spdm_common_LIBRARY
     spdm_requester_lib
     spdm_common_lib
     ${CRYPTO_LIB_PATHS}
+    ${X509_PARSER_LIB_PATHS}
     rnglib
     cryptlib_${CRYPTO}
+    x509_parser_${X509_PARSER}
     malloclib
     spdm_crypt_lib
     spdm_secured_message_lib
