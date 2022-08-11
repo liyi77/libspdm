@@ -32,7 +32,6 @@ SET(src_cryptlib_null
     pk/sm2.c
     pk/rsa_basic.c
     pk/rsa_ext.c
-    pk/x509.c
     rand/rand.c
 )
 

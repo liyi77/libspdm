@@ -8,7 +8,7 @@
  * X.509 Certificate Handler Wrapper Implementation.
  **/
 
-#include "internal_crypt_lib.h"
+#include "internal_x509_parser_lib.h"
 #include <openssl/x509.h>
 #include <openssl/x509v3.h>
 #include <openssl/asn1.h>
