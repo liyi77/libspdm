@@ -18,6 +18,11 @@
 #include <openssl/pem.h>
 #include <openssl/bio.h>
 
+#define LIBSPDM_USE_INDEPENDENT_CERT_LIB 1
+#if LIBSPDM_USE_INDEPENDENT_CERT_LIB
+/* #include <cryptlib.h> */
+#endif
+
 /*buffer size to store subject object*/
 #define MAX_SBUJECT_NAME_LEN 0x100
 
@@ -1520,6 +1525,14 @@ bool libspdm_rsa_get_public_key_from_x509(const uint8_t *cert, size_t cert_size,
     bool res;
     EVP_PKEY *pkey;
     X509 *x509_cert;
+#if LIBSPDM_USE_INDEPENDENT_CERT_LIB
+    const BIGNUM *bn_n;
+    const BIGNUM *bn_e;
+    uint8_t *rsa_n;
+    size_t rsa_n_len;
+    uint8_t *rsa_e;
+    size_t rsa_e_len;
+#endif
 
 
     /* Check input parameters.*/
@@ -1530,6 +1543,12 @@ bool libspdm_rsa_get_public_key_from_x509(const uint8_t *cert, size_t cert_size,
 
     pkey = NULL;
     x509_cert = NULL;
+#if LIBSPDM_USE_INDEPENDENT_CERT_LIB
+    bn_n = NULL;
+    bn_e = NULL;
+    rsa_n = NULL;
+    rsa_e = NULL;
+#endif
 
 
     /* Read DER-encoded X509 Certificate and Construct X509 object.*/
@@ -1551,6 +1570,33 @@ bool libspdm_rsa_get_public_key_from_x509(const uint8_t *cert, size_t cert_size,
     }
 
 
+#if LIBSPDM_USE_INDEPENDENT_CERT_LIB
+    RSA_get0_key(EVP_PKEY_get0_RSA(pkey), &bn_n, &bn_e, NULL);
+    if (bn_e == NULL || bn_n == NULL) {
+        goto done;
+    }
+
+    rsa_e_len = BN_num_bytes(bn_e);
+    rsa_n_len = BN_num_bytes(bn_n);
+
+    rsa_e = allocate_pool(rsa_e_len);
+    rsa_n = allocate_pool(rsa_n_len);
+    if(rsa_e == NULL || rsa_n == NULL) {
+        goto done;
+    }
+
+    BN_bn2bin(bn_e, rsa_e);
+    BN_bn2bin(bn_n, rsa_n);
+
+    *rsa_context = libspdm_rsa_new();
+    if (!libspdm_rsa_set_key(*rsa_context, LIBSPDM_RSA_KEY_N, rsa_n, rsa_n_len) ||
+        !libspdm_rsa_set_key(*rsa_context, LIBSPDM_RSA_KEY_E, rsa_e, rsa_e_len)) {
+        libspdm_rsa_free(*rsa_context);
+        *rsa_context = NULL;
+        goto done;
+    }
+    res = true;
+#else
     /* Duplicate RSA context from the retrieved EVP_PKEY.*/
 
     if ((*rsa_context = RSAPublicKey_dup(EVP_PKEY_get0_RSA(pkey))) !=
@@ -1558,6 +1604,7 @@ bool libspdm_rsa_get_public_key_from_x509(const uint8_t *cert, size_t cert_size,
         res = true;
     }
 
+#endif
 done:
 
     /* Release Resources.*/
@@ -1570,9 +1617,44 @@ done:
         EVP_PKEY_free(pkey);
     }
 
+#if LIBSPDM_USE_INDEPENDENT_CERT_LIB
+    if(rsa_n != NULL) {
+        free_pool(rsa_n);
+    }
+    if(rsa_e != NULL) {
+        free_pool(rsa_e);
+    }
+#endif
     return res;
 }
 
+size_t libspdm_internal_ec_get_public_nid_from_x509(EVP_PKEY *pkey)
+{
+    int32_t openssl_nid;
+    size_t libspdm_nid;
+
+    openssl_nid =
+        EC_GROUP_get_curve_name(EC_KEY_get0_group((const EC_KEY*)EVP_PKEY_get0_EC_KEY(pkey)));
+
+    switch (openssl_nid)
+    {
+    case NID_X9_62_prime256v1:
+        libspdm_nid = LIBSPDM_CRYPTO_NID_SECP256R1;
+        break;
+    case NID_secp384r1:
+        libspdm_nid = LIBSPDM_CRYPTO_NID_SECP384R1;
+        break;
+    case NID_secp521r1:
+        libspdm_nid = LIBSPDM_CRYPTO_NID_SECP521R1;
+        break;
+
+    default:
+        libspdm_nid = LIBSPDM_CRYPTO_NID_NULL;
+        break;
+    }
+
+    return libspdm_nid;
+}
 /**
  * Retrieve the EC public key from one DER-encoded X509 certificate.
  *
@@ -1595,6 +1677,11 @@ bool libspdm_ec_get_public_key_from_x509(const uint8_t *cert, size_t cert_size,
     bool res;
     EVP_PKEY *pkey;
     X509 *x509_cert;
+#if LIBSPDM_USE_INDEPENDENT_CERT_LIB
+    uint8_t *key_data;
+    uint8_t *key_data_head;
+    size_t key_len;
+#endif
 
 
     /* Check input parameters.*/
@@ -1605,6 +1692,10 @@ bool libspdm_ec_get_public_key_from_x509(const uint8_t *cert, size_t cert_size,
 
     pkey = NULL;
     x509_cert = NULL;
+#if LIBSPDM_USE_INDEPENDENT_CERT_LIB
+    key_data = NULL;
+    key_len = 0;
+#endif
 
 
     /* Read DER-encoded X509 Certificate and Construct X509 object.*/
@@ -1626,11 +1717,40 @@ bool libspdm_ec_get_public_key_from_x509(const uint8_t *cert, size_t cert_size,
     }
 
 
+#if LIBSPDM_USE_INDEPENDENT_CERT_LIB
+    key_len = i2d_PublicKey(pkey, NULL);
+    if (key_len == 0) {
+        goto done;
+    }
+
+    key_data = allocate_pool(key_len);
+    if(key_data == NULL) {
+        goto done;
+    }
+
+    key_data_head = key_data;
+    i2d_PublicKey(pkey, &key_data_head);
+
+    *ec_context = libspdm_ec_new_by_nid(libspdm_internal_ec_get_public_nid_from_x509(pkey));
+
+    if (*ec_context == NULL) {
+        goto done;
+    }
+
+    /* The first byte of key_data is compression form */
+    if (!libspdm_ec_set_pub_key(*ec_context, key_data + 1, key_len - 1)) {
+        libspdm_ec_free(*ec_context);
+        *ec_context = NULL;
+        goto done;
+    }
+    res = true;
+#else
     /* Duplicate EC context from the retrieved EVP_PKEY.*/
 
     if ((*ec_context = EC_KEY_dup(EVP_PKEY_get0_EC_KEY(pkey))) != NULL) {
         res = true;
     }
+#endif
 
 done:
 
@@ -1643,6 +1763,12 @@ done:
     if (pkey != NULL) {
         EVP_PKEY_free(pkey);
     }
+
+#if LIBSPDM_USE_INDEPENDENT_CERT_LIB
+    if(key_data != NULL) {
+        free_pool(key_data);
+    }
+#endif
 
     return res;
 }
